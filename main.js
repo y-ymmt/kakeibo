@@ -1,0 +1,218 @@
+function getH3CellValueFromAllSpreadsheetsInFolder() {
+  // フォルダのIDを指定
+  var folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
+
+  // 現在のスプレッドシート
+  var currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 一度だけシートを削除するフラグ（削除済みならtrue）
+  var sheetCleared = {};
+
+  // フォルダ内のすべてのファイルを取得
+  var folder = DriveApp.getFolderById(folderId);
+  var files = folder.getFiles();
+
+  // ソート用の配列を初期化
+  var sortedSheets = [];
+
+  // 各ファイルを回す
+  while (files.hasNext()) {
+    var file = files.next();
+
+    // 今見ているファイルがスプシかどうか確認
+    if (file.getMimeType() == MimeType.GOOGLE_SHEETS) {
+      var spreadsheet = SpreadsheetApp.openById(file.getId());
+
+      // テンプレートと貯金（このスプシ）は取得の対象外
+      if (spreadsheet.getName() == "テンプレート" || spreadsheet.getName() == "貯金") {
+        continue;
+      }
+
+      // 年の取得
+      var yearMatch = /(\d{4})年(\d{1,2})月/.exec(spreadsheet.getName());
+      var startYear = yearMatch ? yearMatch[1] : null;
+      var startMonth = yearMatch ? yearMatch[2] : null;
+
+      if (startYear && startMonth) {
+        // 年月を日付データに変換
+        var startDate = new Date(startYear, startMonth - 1); // 月はゼロベースなので、1を引く
+
+        // 年のシートを取得
+        var yearSheet = currentSpreadsheet.getSheetByName(startYear);
+
+        if (!yearSheet) {
+          // 年のシートが存在しない場合はテンプレートを複製して新しいシートを作成
+          var templateSheet = currentSpreadsheet.getSheetByName("テンプレート");
+          var newSheet = templateSheet.copyTo(currentSpreadsheet);
+          newSheet.setName(startYear);
+          yearSheet = newSheet;
+
+          // 一度だけシートを削除するフラグを設定
+          sheetCleared[startYear] = false;
+        }
+
+        // 一度だけシートの内容を削除
+        if (!sheetCleared[startYear]) {
+          clearSheetContent(yearSheet);
+          sheetCleared[startYear] = true; // フラグをリセット
+        }
+
+        // 特定のシートを取得（ここでは1番目のシートを対象としています）
+        var sheet = spreadsheet.getSheets()[1]; // シートのインデックスを調整
+        var h4Value = sheet.getRange("H3").getValue();
+
+        // ソート用のオブジェクトに情報を格納
+        sortedSheets.push({
+          date: startDate,
+          name: spreadsheet.getName(),
+          value: h4Value
+        });
+      }
+    }
+  }
+
+  // 日付で降順ソート
+  sortedSheets.sort(function(a, b) {
+    return b.date - a.date;
+  });
+
+  // ソートされた情報を元にシートに追加
+  for (var i = 0; i < sortedSheets.length; i++) {
+    var sortedSheet = sortedSheets[i];
+    var yearSheet = currentSpreadsheet.getSheetByName(sortedSheet.date.getFullYear().toString());
+    yearSheet.appendRow([Utilities.formatDate(sortedSheet.date, "JST", "yyyy年MM月"), sortedSheet.value]);
+    console.log("スプレッドシート：" + sortedSheet.name + "　　貯金額：" + sortedSheet.value + "円");
+  }
+
+  // 全シートのE2セルに現在の日時を表示
+  updateTimestampForAllSheets(currentSpreadsheet);
+}
+
+
+function clearSheetContent(sheet) {
+  // A列とB列の２行目以降のセルの値を削除
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 2) {  // 2行目以降が存在する場合
+    sheet.getRange(2, 1, lastRow - 1, 2).clearContent();
+  }
+}
+
+function updateTimestampForAllSheets(spreadsheet) {
+  var sheets = spreadsheet.getSheets();
+  var now = new Date();
+  var formattedDate = Utilities.formatDate(now, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
+
+  for (var i = 0; i < sheets.length; i++) {
+    sheets[i].getRange("F1").setValue(formattedDate);
+  }
+}
+
+// 来月のスプレッドシートが無い場合にテンプレートを複製して自動作成
+function copy_template_file() {
+  folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
+
+  // 現在の日付を取得
+  var now = new Date();
+  // 現在の年月を取得
+  var currentYear = now.getFullYear();
+  var currentMonth = now.getMonth() + 1; // 月は0から始まるため1を加える
+  // 来月の年月を取得
+  var nextMonthDate = new Date(currentYear, currentMonth, 1);
+  var nextYear = nextMonthDate.getFullYear();
+  var nextMonth = nextMonthDate.getMonth() + 1; // 月は0から始まるため1を加える
+
+  // ファイル名を作成
+  var fileName = nextYear + "年" + nextMonth + "月";
+  console.log(fileName);
+
+  var folder = DriveApp.getFolderById(folderId);
+  var files = folder.getFilesByName(fileName);
+  if (files.hasNext()) {
+    console.log("来月のスプレッドシートは既に存在したので何もせず終了しました。");
+  } else {
+    console.log("指定されたファイルが見つからないのでテンプレートファイルを複製します。");
+    var templateFiles = folder.getFilesByName("テンプレート");
+    if (templateFiles.hasNext()) {
+      template = templateFiles.next();
+      var newFile = template.makeCopy(fileName, folder);
+
+      // 新しく作成されたファイルのURLを取得
+      var fileUrl = newFile.getUrl();
+
+      // URL添付しLINEに通知
+      sendPost(fileName + "のスプレッドシートを作成しました。以下のURLからアクセスできます。\n" + fileUrl);
+    } else {
+      console.log("テンプレートファイルが見つかりませんでした。");
+    }
+  }
+}
+
+// 現在の年月に対応するスプレッドシートを取得し家計簿情報（予算や支出）をLINEに通知する
+function line_bot() {
+  var folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
+
+  // 現在の日付を取得
+  var now = new Date();
+  fileName = Utilities.formatDate(now, "Asia/Tokyo", "yyyy年M月");
+  console.log(fileName);
+
+  var folder = DriveApp.getFolderById(folderId);
+  var files = folder.getFilesByName(fileName);
+  if (files.hasNext()) {
+    var file = files.next();
+    var spreadsheet = SpreadsheetApp.openById(file.getId());
+    var sheet = spreadsheet.getSheetByName("集計");
+    if (sheet) {
+      var result = {};
+      result.L3 = sheet.getRange('L3').getValue();
+      result.D3 = sheet.getRange('D3').getValue();
+      result.E3 = sheet.getRange('E3').getValue();
+      result.H3 = sheet.getRange('H3').getValue();
+
+      // 数値を金額表示に変換
+      result.L3 = convertToCurrencyFormat(result.L3);
+      result.D3 = convertToCurrencyFormat(result.D3);
+      result.E3 = convertToCurrencyFormat(result.E3);
+      result.H3 = convertToCurrencyFormat(result.H3);
+      
+      content = "\n" + fileName + "の家計簿情報\n収入は " + result.L3 + "円\n予算は " + result.D3 + "円\n支出は " + result.E3 + "円\n差分（収入-支出)は " + result.H3 + "円\nです";
+
+      sendPost(content);
+      
+    } else {
+      console.log("指定されたシートが見つかりませんでした。");
+    }
+  } else {
+    console.log("指定されたファイルが見つかりませんでした。");
+  }
+}
+
+// 引数（content）に渡された文字列を家計簿通知botに送信する
+function sendPost(content) {
+  var token = "Iv8ZLPQ9Nk2YoRaqmx7BEhXhSp940YBUotXsIBLlG3w";
+  var options = {
+    "method": "post",
+    "payload": {"message": content},
+    "headers": {"Authorization": "Bearer " + token}
+  };
+  UrlFetchApp.fetch("https://notify-api.line.me/api/notify", options);
+}
+
+// 指定された数値を金額表示に変換する
+function convertToCurrencyFormat(number) {
+  return Number(number).toLocaleString('ja-JP');
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
