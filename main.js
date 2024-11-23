@@ -189,13 +189,26 @@ function line_bot() {
 
 // 引数（content）に渡された文字列を家計簿通知botに送信する
 function sendPost(content) {
-  var token = "Iv8ZLPQ9Nk2YoRaqmx7BEhXhSp940YBUotXsIBLlG3w";
-  var options = {
-    "method": "post",
-    "payload": {"message": content},
-    "headers": {"Authorization": "Bearer " + token}
-  };
-  UrlFetchApp.fetch("https://notify-api.line.me/api/notify", options);
+  // pushメッセージURL
+  const push = 'https://api.line.me/v2/bot/message/broadcast';
+  // LINE Messaging APIのアクセストークン
+  const token = "v4+O88cqtU0iIx4jb1GJ0r0UubhXi3z8Rp2ydsAEUDW829vBZEr2u+ogeZ+yo4FtQhbGc3sBJfP3iHnzSH5m+A22ZLLAH95i1NiNNCN/ku2ZlDlmwus8BnQYMS51Jg6WK++T51FvYuewUn/Tvs3Z3QdB04t89/1O/w1cDnyilFU=";
+
+  UrlFetchApp.fetch(push, {
+    method: 'post',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+    },
+    payload: JSON.stringify({
+        messages: [
+            {
+                type: 'text',
+                text: content
+            }
+        ]
+    })
+});
 }
 
 // 指定された数値を金額表示に変換する
