@@ -1,30 +1,34 @@
 function getH3CellValueFromAllSpreadsheetsInFolder() {
-  // フォルダのIDを指定
-  var folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
+  // 家計簿フォルダのIDを指定
+  const folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
 
-  // 現在のスプレッドシート
-  var currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  // 貯金シートを取得
+  const currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
 
   // 一度だけシートを削除するフラグ（削除済みならtrue）
-  var sheetCleared = {};
+  let sheetCleared = {};
 
   // フォルダ内のすべてのファイルを取得
-  var folder = DriveApp.getFolderById(folderId);
-  var files = folder.getFiles();
+  const folder = DriveApp.getFolderById(folderId);
+  const files = folder.getFiles();
 
   // ソート用の配列を初期化
-  var sortedSheets = [];
+  let sortedSheets = [];
+
+  // 日付を取得
+  const now = new Date();
+  const currentYear = now.getFullYear().toString();
 
   // 各ファイルを回す
   while (files.hasNext()) {
-    var file = files.next();
+    let file = files.next();
 
     // 今見ているファイルがスプシかどうか確認
-    if (file.getMimeType() == MimeType.GOOGLE_SHEETS) {
-      var spreadsheet = SpreadsheetApp.openById(file.getId());
+    if (file.getMimeType() === "application/vnd.google-apps.spreadsheet") {
+      let spreadsheet = SpreadsheetApp.openById(file.getId());
 
-      // テンプレートと貯金（このスプシ）は取得の対象外
-      if (spreadsheet.getName() == "テンプレート" || spreadsheet.getName() == "貯金") {
+      // 実行している都市以外はスキップ
+      if (!spreadsheet.getName().includes(currentYear)) {
         continue;
       }
 
@@ -84,7 +88,7 @@ function getH3CellValueFromAllSpreadsheetsInFolder() {
     console.log("スプレッドシート：" + sortedSheet.name + "　　貯金額：" + sortedSheet.value + "円");
   }
 
-  // 全シートのE2セルに現在の日時を表示
+  // F1セルに最終更新日時を記録
   updateTimestampForAllSheets(currentSpreadsheet);
 }
 
