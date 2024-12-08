@@ -226,12 +226,9 @@ function getCardUsageInfoFromMail() {
   // 前日の日付範囲を設定
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-
-  const testTime = new Date(2024, 10, 7, 0, 0, 0);
   
   // 日付をYYYY/MM/DD形式に変換
-  const formattedDate = Utilities.formatDate(testTime, 'Asia/Tokyo', 'yyyy/MM/dd');
-  // const formattedDate = Utilities.formatDate(yesterday, 'Asia/Tokyo', 'yyyy/MM/dd');
+  const formattedDate = Utilities.formatDate(yesterday, 'Asia/Tokyo', 'yyyy/MM/dd');
   
   // メール検索条件を設定
   const searchQuery = `subject:"【三菱UFJ-JCBデビット】ご利用のお知らせ" after:${formattedDate}`;
