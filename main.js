@@ -269,6 +269,7 @@ function getCardUsageInfoFromMail() {
           "三菱UFJ-JCBデビット",
           "ゆう",
           formattedDate,  // フォーマットされた日付を使用
+          "GASにより自動登録"
         ]);
       }
     });
