@@ -250,7 +250,7 @@ function getCardUsageInfoFromMail() {
       
       // 正規表現パターンを修正
       const dateTimeMatch = body.match(/【ご利用日時\(日本時間\)】　(\d{4}年\d{1,2}月\d{1,2}日\s+\d{1,2}:\d{2})/);
-      const amountMatch = body.match(/【ご利用金額】　([0-9,]+)円/);
+      const amountMatch = body.match(/【ご利用金額】　(-?[0-9,]+)円/);
       const storeMatch = body.match(/【ご利用先】　(.+?)(?:\r?\n)/);
 
       if (dateTimeMatch && amountMatch && storeMatch) {
@@ -270,7 +270,7 @@ function getCardUsageInfoFromMail() {
           "",
           "三菱UFJ-JCBデビット",
           "ゆう",
-          formattedDate,  // フォーマットされた日付を使用
+          formattedDate,
           "GASにより自動登録"
         ]);
       }
