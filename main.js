@@ -238,6 +238,7 @@ function getCardUsageInfoFromMail() {
   const cardUsages = [];
 
   if (threads.length === 0) {
+    sendPost("昨日のカード利用情報はありませんでした。");
     return;
   }
 
