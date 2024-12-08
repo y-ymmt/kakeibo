@@ -273,6 +273,7 @@ function getCardUsageInfoFromMail() {
   });
 
   addPaymentInfoToSpreadsheet(cardUsages);
+  sendPost("カード利用情報を登録しました。");
 }
 
 // 現在の年月のスプレッドシートを取得する
