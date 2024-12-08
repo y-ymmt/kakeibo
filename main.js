@@ -62,7 +62,7 @@ function getH3CellValueFromAllSpreadsheetsInFolder() {
         }
 
         // 特定のシートを取得（ここでは1番目のシートを対象としています）
-        var sheet = spreadsheet.getSheets()[1]; // シートのインデックスを調整
+        var sheet = spreadsheet.getSheets()[1];
         var h4Value = sheet.getRange("H3").getValue();
 
         // ソート用のオブジェクトに情報を格納
@@ -221,6 +221,93 @@ function convertToCurrencyFormat(number) {
 }
 
 
+// メールからカード利用情報を取得する
+function getCardUsageInfoFromMail() {
+  // 前日の日付範囲を設定
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const testTime = new Date(2024, 10, 7, 0, 0, 0);
+  
+  // 日付をYYYY/MM/DD形式に変換
+  const formattedDate = Utilities.formatDate(testTime, 'Asia/Tokyo', 'yyyy/MM/dd');
+  // const formattedDate = Utilities.formatDate(yesterday, 'Asia/Tokyo', 'yyyy/MM/dd');
+  
+  // メール検索条件を設定
+  const searchQuery = `subject:"【三菱UFJ-JCBデビット】ご利用のお知らせ" after:${formattedDate}`;
+
+  // メールを検索
+  const threads = GmailApp.search(searchQuery);
+  const cardUsages = [];
+
+  // 各メールから情報を抽出
+  threads.forEach(thread => {
+    const messages = thread.getMessages();
+    messages.forEach(message => {
+      const body = message.getPlainBody();
+      
+      // 正規表現パターンを修正
+      const dateTimeMatch = body.match(/【ご利用日時\(日本時間\)】　(\d{4}年\d{1,2}月\d{1,2}日\s+\d{1,2}:\d{2})/);
+      const amountMatch = body.match(/【ご利用金額】　([0-9,]+)円/);
+      const storeMatch = body.match(/【ご利用先】　(.+?)(?:\r?\n)/);
+
+      if (dateTimeMatch && amountMatch && storeMatch) {
+        // 日付文字列を Date オブジェクトに変換し、スプレッドシート用にフォーマット
+        const dateStr = dateTimeMatch[1];  // 例: "2024年3月15日 15:30"
+        const date = new Date(dateStr.replace(/年|月/g, '/').replace(/日/g, ''));
+        const formattedDate = Utilities.formatDate(date, 'Asia/Tokyo', 'yyyy/MM/dd');
+
+        cardUsages.push([
+          "",
+          "",
+          amountMatch[1].replace(/,/g, ''),
+          storeMatch[1].trim(),
+          "",
+          "",
+          "",
+          "",
+          "三菱UFJ-JCBデビット",
+          "ゆう",
+          formattedDate,  // フォーマットされた日付を使用
+        ]);
+      }
+    });
+  });
+
+  addPaymentInfoToSpreadsheet(cardUsages);
+}
+
+// 現在の年月のスプレッドシートを取得する
+function getCurrentMonthSpreadsheet() {
+  // 家計簿フォルダのID
+  const folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
+  
+  // 現在の日付を取得してフォーマット（例：2024年3月）
+  const now = new Date();
+  const fileName = Utilities.formatDate(now, "Asia/Tokyo", "yyyy年M月");
+  
+  // フォルダを取得
+  const folder = DriveApp.getFolderById(folderId);
+  const files = folder.getFilesByName(fileName);
+  
+  if (files.hasNext()) {
+    const file = files.next();
+    return SpreadsheetApp.openById(file.getId());
+  } else {
+    console.log(`${fileName}のスプレッドシートが見つかりませんでした。`);
+    return null;
+  }
+}
+
+// カード利用情報をスプレッドシートに追加する
+function addPaymentInfoToSpreadsheet(cardUsages) {
+  const spreadsheet = getCurrentMonthSpreadsheet();
+  const sheet = spreadsheet.getSheetByName("支出一覧");
+  const lastRow = sheet.getLastRow();
+  const insertRow = lastRow + 1;  // 最終行の次の行に挿入
+
+  sheet.getRange(insertRow, 1, cardUsages.length, cardUsages[0].length).setValues(cardUsages);
+}
 
 
 
