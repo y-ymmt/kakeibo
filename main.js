@@ -237,6 +237,10 @@ function getCardUsageInfoFromMail() {
   const threads = GmailApp.search(searchQuery);
   const cardUsages = [];
 
+  if (threads.length === 0) {
+    return;
+  }
+
   // 各メールから情報を抽出
   threads.forEach(thread => {
     const messages = thread.getMessages();
