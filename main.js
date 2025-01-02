@@ -222,7 +222,7 @@ function convertToCurrencyFormat(number) {
 
 
 // メールからカード利用情報を取得する
-function getCardUsageInfoFromMail() {
+function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardType) {
   // 前日の日付範囲を設定
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -231,7 +231,7 @@ function getCardUsageInfoFromMail() {
   const formattedDate = Utilities.formatDate(yesterday, 'Asia/Tokyo', 'yyyy/MM/dd');
   
   // メール検索条件を設定
-  const searchQuery = `subject:"【三菱UFJ-JCBデビット】ご利用のお知らせ" after:${formattedDate}`;
+  const searchQuery = `subject:${subject} after:${formattedDate}`;
 
   // メールを検索
   const threads = GmailApp.search(searchQuery);
@@ -248,10 +248,14 @@ function getCardUsageInfoFromMail() {
     messages.forEach(message => {
       const body = message.getPlainBody();
       
-      // 正規表現パターンを修正
-      const dateTimeMatch = body.match(/【ご利用日時\(日本時間\)】　(\d{4}年\d{1,2}月\d{1,2}日\s+\d{1,2}:\d{2})/);
-      const amountMatch = body.match(/【ご利用金額】　(-?[0-9,]+)円/);
-      const storeMatch = body.match(/【ご利用先】　(.+?)(?:\r?\n)/);
+      // 正規表現パターンを使用
+      const dateTimeMatch = body.match(regTime);
+      const amountMatch = body.match(regAmount);
+      const storeMatch = body.match(regStore);
+
+      Logger.log(dateTimeMatch);
+      Logger.log(amountMatch);
+      Logger.log(storeMatch);
 
       if (dateTimeMatch && amountMatch && storeMatch) {
         // 日付文字列を Date オブジェクトに変換し、スプレッドシート用にフォーマット
@@ -268,17 +272,46 @@ function getCardUsageInfoFromMail() {
           "",
           "",
           "",
-          "三菱UFJ-JCBデビット",
+          cardType,
           "ゆう",
           formattedDate,
           "GASにより自動登録"
         ]);
+      } else {
+        Logger.log("情報が見つかりませんでした。");
       }
     });
   });
 
-  addPaymentInfoToSpreadsheet(cardUsages);
-  sendPost("カード利用情報を登録しました。");
+  if (cardUsages.length === 0) {
+    sendPost("昨日のカード利用情報はありませんでした。");
+    return;
+  } else {
+    addPaymentInfoToSpreadsheet(cardUsages);
+    sendPost(`（${cardType}）カード利用情報を登録しました。`);
+  }
+}
+
+// 三菱カード情報取得
+function getMitsubishiCardUsageInfoFromMail() {
+  getCardUsageInfoFromMail(
+    "【三菱UFJ-JCBデビット】ご利用のお知らせ",
+    /【ご利用日時\(日本時間\)】　(\d{4}年\d{1,2}月\d{1,2}日\s+\d{1,2}:\d{2})/,
+    /【ご利用金額】　(-?[0-9,]+)円/,
+    /【ご利用先】　([^\r\n]+)/,
+    "三菱カード"
+  );
+}
+
+// 三井住友カード情報取得
+function getMitsuisumitomoCardUsageInfoFromMail() {
+  getCardUsageInfoFromMail(
+    "ご利用のお知らせ【三井住友カード】",
+    /◇利用日[\s　]*：(\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2})/,
+    /◇利用金額：(-?[0-9,]+)円/,
+    /◇利用先[\s　]*：([^\r\n]+)/,
+    "三井住友カード"
+  );
 }
 
 // 現在の年月のスプレッドシートを取得する
