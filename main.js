@@ -179,7 +179,7 @@ function line_bot() {
       result.E3 = convertToCurrencyFormat(result.E3);
       result.G3 = convertToCurrencyFormat(result.G3);
       
-      content = "\n" + fileName + "の家計簿情報\n収入は " + result.L3 + "円\n予算は " + result.D3 + "円\n支出は " + result.E3 + "円\n差分（収入-支出)は " + result.G3 + "円\nです";
+      content = "\n" + fileName + "の家計簿情報\n収入は " + result.L3 + "円\n予算は " + result.D3 + "円\n支出は " + result.E3 + "円\n差分（予算-支出)は " + result.G3 + "円\nです";
 
       sendPost(content);
       
