@@ -171,15 +171,15 @@ function line_bot() {
       result.L3 = sheet.getRange('L3').getValue();
       result.D3 = sheet.getRange('D3').getValue();
       result.E3 = sheet.getRange('E3').getValue();
-      result.H3 = sheet.getRange('H3').getValue();
+      result.G3 = sheet.getRange('G3').getValue();
 
       // 数値を金額表示に変換
       result.L3 = convertToCurrencyFormat(result.L3);
       result.D3 = convertToCurrencyFormat(result.D3);
       result.E3 = convertToCurrencyFormat(result.E3);
-      result.H3 = convertToCurrencyFormat(result.H3);
+      result.G3 = convertToCurrencyFormat(result.G3);
       
-      content = "\n" + fileName + "の家計簿情報\n収入は " + result.L3 + "円\n予算は " + result.D3 + "円\n支出は " + result.E3 + "円\n差分（収入-支出)は " + result.H3 + "円\nです";
+      content = "\n" + fileName + "の家計簿情報\n収入は " + result.L3 + "円\n予算は " + result.D3 + "円\n支出は " + result.E3 + "円\n差分（収入-支出)は " + result.G3 + "円\nです";
 
       sendPost(content);
       
