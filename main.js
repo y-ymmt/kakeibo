@@ -253,10 +253,6 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
       const amountMatch = body.match(regAmount);
       const storeMatch = body.match(regStore);
 
-      Logger.log(dateTimeMatch);
-      Logger.log(amountMatch);
-      Logger.log(storeMatch);
-
       if (dateTimeMatch && amountMatch && storeMatch) {
         // 日付文字列を Date オブジェクトに変換し、スプレッドシート用にフォーマット
         const dateStr = dateTimeMatch[1];  // 例: "2024年3月15日 15:30"
@@ -284,7 +280,7 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
   });
 
   if (cardUsages.length === 0) {
-    sendPost("昨日のカード利用情報はありませんでした。");
+    sendPost(`（${cardType}）カード利用情報はありませんでした。`);
     return;
   } else {
     addPaymentInfoToSpreadsheet(cardUsages);
