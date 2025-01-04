@@ -222,7 +222,7 @@ function convertToCurrencyFormat(number) {
 
 
 // メールからカード利用情報を取得する
-function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardType) {
+function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardType, transactionType) {
   // 前日の日付範囲を設定
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -238,7 +238,7 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
   const cardUsages = [];
 
   if (threads.length === 0) {
-    sendPost("昨日のカード利用情報はありませんでした。");
+    sendPost(`（${cardType} ${transactionType}）カード利用情報はありませんでした。`);
     return;
   }
 
@@ -251,6 +251,9 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
       // 正規表現パターンを使用
       const dateTimeMatch = body.match(regTime);
       const amountMatch = body.match(regAmount);
+      if (transactionType === "入金") {
+        amountMatch[1] = `-${amountMatch[1]}`;
+      }
       const storeMatch = body.match(regStore);
 
       if (dateTimeMatch && amountMatch && storeMatch) {
@@ -280,11 +283,11 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
   });
 
   if (cardUsages.length === 0) {
-    sendPost(`（${cardType}）カード利用情報はありませんでした。`);
+    sendPost(`（${cardType} ${transactionType}）カード利用情報はありませんでした。`);
     return;
   } else {
     addPaymentInfoToSpreadsheet(cardUsages);
-    sendPost(`（${cardType}）カード利用情報を登録しました。`);
+    sendPost(`（${cardType} ${transactionType}）カード利用情報を登録しました。`);
   }
 }
 
@@ -295,7 +298,8 @@ function getMitsubishiCardUsageInfoFromMail() {
     /【ご利用日時\(日本時間\)】　(\d{4}年\d{1,2}月\d{1,2}日\s+\d{1,2}:\d{2})/,
     /【ご利用金額】　(-?[0-9,]+)円/,
     /【ご利用先】　([^\r\n]+)/,
-    "三菱カード"
+    "三菱カード",
+    "出金"
   );
 }
 
@@ -306,8 +310,18 @@ function getMitsuisumitomoCardUsageInfoFromMail() {
     /◇利用日[\s　]*：(\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2})/,
     /◇利用金額：(-?[0-9,]+)円/,
     /◇利用先[\s　]*：([^\r\n]+)/,
-    "三井住友カード"
+    "三井住友カード",
+    "出金"
   );
+
+  getCardUsageInfoFromMail(
+    "【三井住友銀行】振込入金のお知らせ",
+    /入金日[\s　]*：[\s　]*(\d{4}年\d{1,2}月\d{1,2}日)/,
+    /金額[\s　]*：[\s　]*(-?[0-9,]+)円/,
+    /内容[\s　]*：[\s　]*([^\r\n]+)/,
+    "三井住友カード",
+    "入金"
+  )
 }
 
 // 現在の年月のスプレッドシートを取得する
