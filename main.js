@@ -292,7 +292,7 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
 }
 
 // 三菱カード情報取得
-function getMitsubishiCardUsageInfoFromMail() {
+function mainGetCardUsageInfoFromMail() {
   getCardUsageInfoFromMail(
     "【三菱UFJ-JCBデビット】ご利用のお知らせ",
     /【ご利用日時\(日本時間\)】　(\d{4}年\d{1,2}月\d{1,2}日\s+\d{1,2}:\d{2})/,
@@ -301,10 +301,7 @@ function getMitsubishiCardUsageInfoFromMail() {
     "三菱カード",
     "出金"
   );
-}
 
-// 三井住友カード情報取得
-function getMitsuisumitomoCardUsageInfoFromMail() {
   getCardUsageInfoFromMail(
     "ご利用のお知らせ【三井住友カード】",
     /◇利用日[\s　]*：(\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2})/,
