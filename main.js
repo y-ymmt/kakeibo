@@ -283,7 +283,8 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
   });
 
   if (cardUsages.length === 0) {
-    sendPost(`（${cardType} ${transactionType}）カード利用情報はありませんでした。`);
+    // カード利用情報がない場合はログに出力
+    Logger.log(`（${cardType} ${transactionType}）カード利用情報はありませんでした。`);
     return;
   } else {
     addPaymentInfoToSpreadsheet(cardUsages);
