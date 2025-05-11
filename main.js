@@ -238,7 +238,7 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
   const cardUsages = [];
 
   if (threads.length === 0) {
-    sendPost(`（${cardType} ${transactionType}）カード利用情報はありませんでした。`);
+    Logger.log(`（${cardType} ${transactionType}）カード利用情報はありませんでした。`);
     return;
   }
 
