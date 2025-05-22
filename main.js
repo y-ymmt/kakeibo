@@ -1,98 +1,185 @@
+/** @const {string} 家計簿関連のファイルが格納されているGoogle DriveのフォルダID */
+const FOLDER_ID = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
+/** @const {string} 新しい年次集計シートを作成する際のテンプレートとなるシート名 */
+const TEMPLATE_SHEET_NAME = "テンプレート";
+/** @const {string} 各月のスプレッドシート内で集計データが記載されているシート名 */
+const SUMMARY_SHEET_NAME = "集計";
+/** @const {string} 各月のスプレッドシート内で支出一覧データが記載されているシート名 */
+const EXPENSE_SHEET_NAME = "支出一覧";
+
+/**
+ * 指定されたフォルダ内のすべての月次家計簿スプレッドシートからH3セルの値を集計し、
+ * 年次集計シートに記録します。
+ * 年次集計シートが存在しない場合は、テンプレートから新しく作成します。
+ * 各年次シートのA列とB列の内容は、処理の開始時に一度クリアされます。
+ * 最後に、すべてのシートのF1セルに最終更新日時を記録します。
+ */
 function getH3CellValueFromAllSpreadsheetsInFolder() {
-  // 家計簿フォルダのIDを指定
-  const folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
-
-  // 貯金シートを取得
   const currentSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-
-  // 一度だけシートを削除するフラグ（削除済みならtrue）
   let sheetCleared = {};
+  const files = DriveApp.getFolderById(FOLDER_ID).getFiles();
+  let allSheetData = [];
 
-  // フォルダ内のすべてのファイルを取得
-  const folder = DriveApp.getFolderById(folderId);
-  const files = folder.getFiles();
+  const globalConsts = {
+    FOLDER_ID: FOLDER_ID,
+    TEMPLATE_SHEET_NAME: TEMPLATE_SHEET_NAME,
+    SUMMARY_SHEET_NAME: SUMMARY_SHEET_NAME,
+    EXPENSE_SHEET_NAME: EXPENSE_SHEET_NAME
+  };
 
-  // ソート用の配列を初期化
-  let sortedSheets = [];
-
-  // 日付を取得
-  const now = new Date();
-  const currentYear = now.getFullYear().toString();
-
-  // 各ファイルを回す
   while (files.hasNext()) {
     let file = files.next();
+    const monthlyData = _extractDataFromMonthlySheet(file);
 
-    // 今見ているファイルがスプシかどうか確認
-    if (file.getMimeType() === "application/vnd.google-apps.spreadsheet") {
-      let spreadsheet = SpreadsheetApp.openById(file.getId());
+    if (monthlyData) {
+      const yearSheetResult = _getOrCreateYearSheet(currentSpreadsheet, monthlyData.startYear, globalConsts.TEMPLATE_SHEET_NAME, globalConsts);
+      let yearSheet = yearSheetResult.sheet;
 
-      // 実行している都市以外はスキップ
-      if (!spreadsheet.getName().includes(currentYear)) {
-        continue;
+      if (yearSheetResult.newlyCreated || !sheetCleared[monthlyData.startYear]) {
+        clearSheetContent(yearSheet);
+        sheetCleared[monthlyData.startYear] = true;
       }
-
-      // 年の取得
-      var yearMatch = /(\d{4})年(\d{1,2})月/.exec(spreadsheet.getName());
-      var startYear = yearMatch ? yearMatch[1] : null;
-      var startMonth = yearMatch ? yearMatch[2] : null;
-
-      if (startYear && startMonth) {
-        // 年月を日付データに変換
-        var startDate = new Date(startYear, startMonth - 1); // 月はゼロベースなので、1を引く
-
-        // 年のシートを取得
-        var yearSheet = currentSpreadsheet.getSheetByName(startYear);
-
-        if (!yearSheet) {
-          // 年のシートが存在しない場合はテンプレートを複製して新しいシートを作成
-          var templateSheet = currentSpreadsheet.getSheetByName("テンプレート");
-          var newSheet = templateSheet.copyTo(currentSpreadsheet);
-          newSheet.setName(startYear);
-          yearSheet = newSheet;
-
-          // 一度だけシートを削除するフラグを設定
-          sheetCleared[startYear] = false;
-        }
-
-        // 一度だけシートの内容を削除
-        if (!sheetCleared[startYear]) {
-          clearSheetContent(yearSheet);
-          sheetCleared[startYear] = true; // フラグをリセット
-        }
-
-        // 特定のシートを取得（ここでは1番目のシートを対象としています）
-        var sheet = spreadsheet.getSheets()[1];
-        var h4Value = sheet.getRange("H3").getValue();
-
-        // ソート用のオブジェクトに情報を格納
-        sortedSheets.push({
-          date: startDate,
-          name: spreadsheet.getName(),
-          value: h4Value
-        });
-      }
+      allSheetData.push(monthlyData);
     }
   }
 
-  // 日付で降順ソート
-  sortedSheets.sort(function(a, b) {
-    return b.date - a.date;
-  });
+  const sortedData = _sortSheetData(allSheetData);
 
-  // ソートされた情報を元にシートに追加
-  for (var i = 0; i < sortedSheets.length; i++) {
-    var sortedSheet = sortedSheets[i];
-    var yearSheet = currentSpreadsheet.getSheetByName(sortedSheet.date.getFullYear().toString());
-    yearSheet.appendRow([Utilities.formatDate(sortedSheet.date, "JST", "yyyy年MM月"), sortedSheet.value]);
-    console.log("スプレッドシート：" + sortedSheet.name + "　　貯金額：" + sortedSheet.value + "円");
+  for (var i = 0; i < sortedData.length; i++) {
+    var dataItem = sortedData[i];
+    // Ensure we are populating to the correct year sheet, potentially re-fetching it if necessary,
+    // though _getOrCreateYearSheet would have already created it.
+    var yearSheet = currentSpreadsheet.getSheetByName(dataItem.startYear.toString());
+    if(yearSheet) { // Check if sheet exists, it should at this point.
+      _populateSummarySheet(yearSheet, dataItem);
+    } else {
+      console.error("Year sheet " + dataItem.startYear + " not found for populating data for " + dataItem.name);
+    }
   }
 
-  // F1セルに最終更新日時を記録
   updateTimestampForAllSheets(currentSpreadsheet);
 }
 
+/**
+ * 月次スプレッドシートファイルからデータを抽出します。
+ * ファイルが当年のものでない場合、または必要な情報（年、月、H3セルの値）が
+ * 取得できない場合はnullを返します。
+ * @param {GoogleAppsScript.Drive.File} file 処理対象のGoogle Drive上のファイルオブジェクト。
+ * @return {?{date: Date, name: string, value: *, startYear: string}} 抽出されたデータオブジェクト、またはnull。
+ *                                                                   オブジェクトには、日付、スプレッドシート名、H3セルの値、年が含まれます。
+ * @private
+ */
+function _extractDataFromMonthlySheet(file) {
+  const currentYear = new Date().getFullYear().toString();
+  if (file.getMimeType() === "application/vnd.google-apps.spreadsheet") {
+    let spreadsheet = SpreadsheetApp.openById(file.getId());
+    if (!spreadsheet.getName().includes(currentYear)) {
+      return null;
+    }
 
+    var yearMatch = /(\d{4})年(\d{1,2})月/.exec(spreadsheet.getName());
+    var startYear = yearMatch ? yearMatch[1] : null;
+    var startMonth = yearMatch ? yearMatch[2] : null;
+
+    if (startYear && startMonth) {
+      var startDate = new Date(startYear, startMonth - 1); // Month is zero-based
+      var sheet = spreadsheet.getSheets()[1]; // Assuming data is on the second sheet
+      var h3Value = sheet.getRange("H3").getValue(); // Corrected variable name
+      return {
+        date: startDate,
+        name: spreadsheet.getName(),
+        value: h3Value, // Corrected variable name
+        startYear: startYear
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * 指定された年に対する年次集計シートを取得または作成します。
+ * シートが存在しない場合は、指定されたテンプレートシート名に基づいて新しいシートを作成します。
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} currentSpreadsheet 現在アクティブなスプレッドシート（年次集計を格納するスプレッドシート）。
+ * @param {string} year 作成または取得する年次集計シートの年（例: "2023"）。
+ * @param {string} templateSheetName 新規作成時に使用するテンプレートシートの名前。
+ * @param {object} globalConsts グローバル定数を含むオブジェクト (この関数内では未使用だが、一貫性のために引数に含まれる)。
+ * @return {{sheet: GoogleAppsScript.Spreadsheet.Sheet, newlyCreated: boolean}} 取得または作成されたシートオブジェクトと、新規作成されたかどうかを示すフラグのオブジェクト。
+ * @private
+ */
+function _getOrCreateYearSheet(currentSpreadsheet, year, templateSheetName, globalConsts) {
+  var yearSheet = currentSpreadsheet.getSheetByName(year);
+  if (!yearSheet) {
+    var templateSheet = currentSpreadsheet.getSheetByName(templateSheetName); // templateSheetName is already globalConsts.TEMPLATE_SHEET_NAME
+    var newSheet = templateSheet.copyTo(currentSpreadsheet);
+    newSheet.setName(year);
+    yearSheet = newSheet;
+    return {sheet: yearSheet, newlyCreated: true};
+  }
+  return {sheet: yearSheet, newlyCreated: false};
+}
+
+/**
+ * 抽出されたシートデータの配列を日付の降順（新しいものが先頭）にソートします。
+ * @param {Array<{date: Date, name: string, value: *, startYear: string}>} data ソート対象のシートデータオブジェクトの配列。
+ * @return {Array<{date: Date, name: string, value: *, startYear: string}>} ソートされたシートデータオブジェクトの配列。
+ * @private
+ */
+function _sortSheetData(data) {
+  return data.sort(function(a, b) {
+    return b.date - a.date;
+  });
+}
+
+/**
+ * ソートされた個々のデータアイテムを年次集計シートに追加します。
+ * 同時に、処理内容をログに出力します。
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} yearSheet データを追加する年次集計シート。
+ * @param {{date: Date, name: string, value: *, startYear: string}} dataItem 追加するデータアイテム。
+ * @private
+ */
+function _populateSummarySheet(yearSheet, dataItem) {
+  yearSheet.appendRow([Utilities.formatDate(dataItem.date, "JST", "yyyy年MM月"), dataItem.value]);
+  console.log("スプレッドシート：" + dataItem.name + "　　貯金額：" + dataItem.value + "円");
+}
+
+/**
+ * 現在の日付情報を取得し、必要な形式で返します。
+ * これには、当年、当月、来月の日付、来年、来月、およびそれらを特定の書式で整形した文字列が含まれます。
+ * @return {{
+ *   currentYear: number,
+ *   currentMonth: number,
+ *   nextMonthDate: Date,
+ *   nextYear: number,
+ *   nextMonth: number,
+ *   formattedCurrentYearMonth: string,
+ *   formattedNextYearMonth: string
+ * }} 現在の日付情報を含むオブジェクト。
+ * @private
+ */
+function _getCurrentDateInfo() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // getMonth() is 0-indexed
+
+  const nextMonthDate = new Date(currentYear, currentMonth, 1); // currentMonth is already +1, so it's correct for next month's 0-indexed month
+  const nextYear = nextMonthDate.getFullYear();
+  const nextMonth = nextMonthDate.getMonth() + 1; // getMonth() is 0-indexed
+
+  return {
+    currentYear: currentYear,
+    currentMonth: currentMonth,
+    nextMonthDate: nextMonthDate,
+    nextYear: nextYear,
+    nextMonth: nextMonth,
+    formattedCurrentYearMonth: currentYear + "年" + currentMonth + "月",
+    formattedNextYearMonth: nextYear + "年" + nextMonth + "月"
+  };
+}
+
+/**
+ * 指定されたシートの2行目以降のA列とB列の内容をクリアします。
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet クリア対象のシート。
+ */
 function clearSheetContent(sheet) {
   // A列とB列の２行目以降のセルの値を削除
   var lastRow = sheet.getLastRow();
@@ -101,6 +188,10 @@ function clearSheetContent(sheet) {
   }
 }
 
+/**
+ * 指定されたスプレッドシート内のすべてのシートのF1セルに、現在のタイムスタンプを記録します。
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet タイムスタンプを記録するスプレッドシート。
+ */
 function updateTimestampForAllSheets(spreadsheet) {
   var sheets = spreadsheet.getSheets();
   var now = new Date();
@@ -111,31 +202,23 @@ function updateTimestampForAllSheets(spreadsheet) {
   }
 }
 
-// 来月のスプレッドシートが無い場合にテンプレートを複製して自動作成
+/**
+ * 来月の家計簿スプレッドシートがまだ存在しない場合に、
+ * テンプレートファイルから新しいスプレッドシートを複製して作成します。
+ * 作成後、LINEに通知します。
+ */
 function copy_template_file() {
-  folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
-
-  // 現在の日付を取得
-  var now = new Date();
-  // 現在の年月を取得
-  var currentYear = now.getFullYear();
-  var currentMonth = now.getMonth() + 1; // 月は0から始まるため1を加える
-  // 来月の年月を取得
-  var nextMonthDate = new Date(currentYear, currentMonth, 1);
-  var nextYear = nextMonthDate.getFullYear();
-  var nextMonth = nextMonthDate.getMonth() + 1; // 月は0から始まるため1を加える
-
-  // ファイル名を作成
-  var fileName = nextYear + "年" + nextMonth + "月";
+  const dateInfo = _getCurrentDateInfo();
+  const fileName = dateInfo.formattedNextYearMonth;
   console.log(fileName);
 
-  var folder = DriveApp.getFolderById(folderId);
+  var folder = DriveApp.getFolderById(FOLDER_ID);
   var files = folder.getFilesByName(fileName);
   if (files.hasNext()) {
     console.log("来月のスプレッドシートは既に存在したので何もせず終了しました。");
   } else {
     console.log("指定されたファイルが見つからないのでテンプレートファイルを複製します。");
-    var templateFiles = folder.getFilesByName("テンプレート");
+    var templateFiles = folder.getFilesByName(TEMPLATE_SHEET_NAME);
     if (templateFiles.hasNext()) {
       template = templateFiles.next();
       var newFile = template.makeCopy(fileName, folder);
@@ -151,21 +234,21 @@ function copy_template_file() {
   }
 }
 
-// 現在の年月に対応するスプレッドシートを取得し家計簿情報（予算や支出）をLINEに通知する
+/**
+ * 現在の年月に対応する家計簿スプレッドシートを取得し、
+ * その集計シートから収入、予算、支出、差分（予算-支出）の情報を取得してLINEに通知します。
+ */
 function line_bot() {
-  var folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
-
-  // 現在の日付を取得
-  var now = new Date();
-  fileName = Utilities.formatDate(now, "Asia/Tokyo", "yyyy年M月");
+  const dateInfo = _getCurrentDateInfo();
+  const fileName = dateInfo.formattedCurrentYearMonth;
   console.log(fileName);
 
-  var folder = DriveApp.getFolderById(folderId);
+  var folder = DriveApp.getFolderById(FOLDER_ID);
   var files = folder.getFilesByName(fileName);
   if (files.hasNext()) {
     var file = files.next();
     var spreadsheet = SpreadsheetApp.openById(file.getId());
-    var sheet = spreadsheet.getSheetByName("集計");
+    var sheet = spreadsheet.getSheetByName(SUMMARY_SHEET_NAME);
     if (sheet) {
       var result = {};
       result.L3 = sheet.getRange('L3').getValue();
@@ -191,12 +274,17 @@ function line_bot() {
   }
 }
 
-// 引数（content）に渡された文字列を家計簿通知botに送信する
+// Make sure to set the 'LINE_ACCESS_TOKEN' script property in Project Settings > Script Properties.
+/**
+ * 指定された文字列メッセージをLINE Botを通じてブロードキャスト送信します。
+ * LINEアクセストークンはスクリプトプロパティから取得します。
+ * @param {string} content 送信するメッセージ内容。
+ */
 function sendPost(content) {
   // pushメッセージURL
   const push = 'https://api.line.me/v2/bot/message/broadcast';
   // LINE Messaging APIのアクセストークン
-  const token = "v4+O88cqtU0iIx4jb1GJ0r0UubhXi3z8Rp2ydsAEUDW829vBZEr2u+ogeZ+yo4FtQhbGc3sBJfP3iHnzSH5m+A22ZLLAH95i1NiNNCN/ku2ZlDlmwus8BnQYMS51Jg6WK++T51FvYuewUn/Tvs3Z3QdB04t89/1O/w1cDnyilFU=";
+  const token = PropertiesService.getScriptProperties().getProperty('LINE_ACCESS_TOKEN');
 
   UrlFetchApp.fetch(push, {
     method: 'post',
@@ -215,14 +303,36 @@ function sendPost(content) {
 });
 }
 
-// 指定された数値を金額表示に変換する
+/**
+ * 指定された数値を日本の通貨形式（例: "1,234"）に変換します。
+ * @param {number|string} number 変換する数値または数値文字列。
+ * @return {string} 通貨形式に変換された文字列。
+ */
 function convertToCurrencyFormat(number) {
   return Number(number).toLocaleString('ja-JP');
 }
 
 
-// メールからカード利用情報を取得する
-function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardType, transactionType) {
+/**
+ * Gmailから指定された条件に一致するメールを検索し、カード利用情報を抽出して
+ * スプレッドシートの支出一覧に追加します。
+ * 処理後、LINEに通知します。
+ * @param {{
+ *   subject: string,
+ *   regTime: RegExp,
+ *   regAmount: RegExp,
+ *   regStore: RegExp,
+ *   cardType: string,
+ *   transactionType: string
+ * }} config カード情報抽出のための設定オブジェクト。
+ *   - subject: 検索対象のメール件名。
+ *   - regTime: 利用日時を抽出する正規表現。
+ *   - regAmount: 利用金額を抽出する正規表現。
+ *   - regStore: 利用店舗を抽出する正規表現。
+ *   - cardType: カードの種類（例: "三菱カード"）。
+ *   - transactionType: 取引の種類（例: "出金", "入金"）。
+ */
+function getCardUsageInfoFromMail(config) {
   // 前日の日付範囲を設定
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -231,14 +341,14 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
   const formattedDate = Utilities.formatDate(yesterday, 'Asia/Tokyo', 'yyyy/MM/dd');
   
   // メール検索条件を設定
-  const searchQuery = `subject:${subject} after:${formattedDate}`;
+  const searchQuery = `subject:${config.subject} after:${formattedDate}`;
 
   // メールを検索
   const threads = GmailApp.search(searchQuery);
   const cardUsages = [];
 
   if (threads.length === 0) {
-    Logger.log(`（${cardType} ${transactionType}）カード利用情報はありませんでした。`);
+    Logger.log(`（${config.cardType} ${config.transactionType}）カード利用情報はありませんでした。`);
     return;
   }
 
@@ -249,18 +359,21 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
       const body = message.getPlainBody();
       
       // 正規表現パターンを使用
-      const dateTimeMatch = body.match(regTime);
-      const amountMatch = body.match(regAmount);
-      if (transactionType === "入金") {
-        amountMatch[1] = `-${amountMatch[1]}`;
+      const dateTimeMatch = body.match(config.regTime);
+      const amountMatch = body.match(config.regAmount);
+      if (config.transactionType === "入金") {
+        // Ensure amountMatch and amountMatch[1] are not null before assignment
+        if (amountMatch && amountMatch[1]) {
+          amountMatch[1] = `-${amountMatch[1]}`;
+        }
       }
-      const storeMatch = body.match(regStore);
+      const storeMatch = body.match(config.regStore);
 
       if (dateTimeMatch && amountMatch && storeMatch) {
         // 日付文字列を Date オブジェクトに変換し、スプレッドシート用にフォーマット
         const dateStr = dateTimeMatch[1];  // 例: "2024年3月15日 15:30"
         const date = new Date(dateStr.replace(/年|月/g, '/').replace(/日/g, ''));
-        const formattedDate = Utilities.formatDate(date, 'Asia/Tokyo', 'yyyy/MM/dd');
+        const formattedSheetDate = Utilities.formatDate(date, 'Asia/Tokyo', 'yyyy/MM/dd');
 
         cardUsages.push([
           "",
@@ -271,61 +384,72 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
           "",
           "",
           "",
-          cardType,
-          "ゆう",
-          formattedDate,
+          config.cardType,
+          "ゆう", // This seems to be a hardcoded user name
+          formattedSheetDate,
           "GASにより自動登録"
         ]);
       } else {
-        Logger.log("情報が見つかりませんでした。");
+        Logger.log("情報が見つかりませんでした。メール内容を確認してください。 Subject: " + config.subject);
       }
     });
   });
 
   if (cardUsages.length === 0) {
     // カード利用情報がない場合はログに出力
-    Logger.log(`（${cardType} ${transactionType}）カード利用情報はありませんでした。`);
+    Logger.log(`（${config.cardType} ${config.transactionType}）カード利用情報はありませんでした。（検索条件: ${searchQuery}）`);
     return;
   } else {
     addPaymentInfoToSpreadsheet(cardUsages);
-    sendPost(`（${cardType} ${transactionType}）カード利用情報を登録しました。`);
+    sendPost(`（${config.cardType} ${config.transactionType}）カード利用情報を登録しました。`);
   }
 }
 
-// 三菱カード情報取得
+/**
+ * 事前に定義された複数のカード設定に基づいて、各カードの利用情報をメールから取得し処理します。
+ * `getCardUsageInfoFromMail` 関数を各設定で呼び出します。
+ */
 function mainGetCardUsageInfoFromMail() {
-  getCardUsageInfoFromMail(
-    "【三菱UFJ-JCBデビット】ご利用のお知らせ",
-    /【ご利用日時\(日本時間\)】　(\d{4}年\d{1,2}月\d{1,2}日\s+\d{1,2}:\d{2})/,
-    /【ご利用金額】　(-?[0-9,]+)円/,
-    /【ご利用先】　([^\r\n]+)/,
-    "三菱カード",
-    "出金"
-  );
+  const cardConfigs = [
+    {
+      subject: "【三菱UFJ-JCBデビット】ご利用のお知らせ",
+      regTime: /【ご利用日時\(日本時間\)】　(\d{4}年\d{1,2}月\d{1,2}日\s+\d{1,2}:\d{2})/,
+      regAmount: /【ご利用金額】　(-?[0-9,]+)円/,
+      regStore: /【ご利用先】　([^\r\n]+)/,
+      cardType: "三菱カード",
+      transactionType: "出金"
+    },
+    {
+      subject: "ご利用のお知らせ【三井住友カード】",
+      regTime: /◇利用日[\s　]*：(\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2})/,
+      regAmount: /◇利用金額：(-?[0-9,]+)円/,
+      regStore: /◇利用先[\s　]*：([^\r\n]+)/,
+      cardType: "三井住友カード",
+      transactionType: "出金"
+    },
+    {
+      subject: "【三井住友銀行】振込入金のお知らせ",
+      regTime: /入金日[\s　]*：[\s　]*(\d{4}年\d{1,2}月\d{1,2}日)/,
+      regAmount: /金額[\s　]*：[\s　]*(-?[0-9,]+)円/,
+      regStore: /内容[\s　]*：[\s　]*([^\r\n]+)/,
+      cardType: "三井住友カード",
+      transactionType: "入金"
+    }
+  ];
 
-  getCardUsageInfoFromMail(
-    "ご利用のお知らせ【三井住友カード】",
-    /◇利用日[\s　]*：(\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2})/,
-    /◇利用金額：(-?[0-9,]+)円/,
-    /◇利用先[\s　]*：([^\r\n]+)/,
-    "三井住友カード",
-    "出金"
-  );
-
-  getCardUsageInfoFromMail(
-    "【三井住友銀行】振込入金のお知らせ",
-    /入金日[\s　]*：[\s　]*(\d{4}年\d{1,2}月\d{1,2}日)/,
-    /金額[\s　]*：[\s　]*(-?[0-9,]+)円/,
-    /内容[\s　]*：[\s　]*([^\r\n]+)/,
-    "三井住友カード",
-    "入金"
-  )
+  for (const config of cardConfigs) {
+    getCardUsageInfoFromMail(config);
+  }
 }
 
-// 現在の年月のスプレッドシートを取得する
+/**
+ * 現在の年月に対応する家計簿スプレッドシートを取得します。
+ * ファイル名は "YYYY年M月" の形式で期待されます。
+ * @return {?GoogleAppsScript.Spreadsheet.Spreadsheet} 見つかった場合はスプレッドシートオブジェクト、見つからない場合はnull。
+ */
 function getCurrentMonthSpreadsheet() {
   // 家計簿フォルダのID
-  const folderId = "12pkf83illSCBi3JzoF2wy2jvRo32lkmF";
+  const folderId = FOLDER_ID;
   
   // 現在の日付を取得してフォーマット（例：2024年3月）
   const now = new Date();
@@ -344,10 +468,13 @@ function getCurrentMonthSpreadsheet() {
   }
 }
 
-// カード利用情報をスプレッドシートに追加する
+/**
+ * 抽出された複数のカード利用情報を、現在の月のスプレッドシートの「支出一覧」シートに追加します。
+ * @param {Array<Array<string>>} cardUsages 追加するカード利用情報の二次元配列。各内部配列は1行分のデータに相当します。
+ */
 function addPaymentInfoToSpreadsheet(cardUsages) {
   const spreadsheet = getCurrentMonthSpreadsheet();
-  const sheet = spreadsheet.getSheetByName("支出一覧");
+  const sheet = spreadsheet.getSheetByName(EXPENSE_SHEET_NAME);
   const lastRow = sheet.getLastRow();
   const insertRow = lastRow + 1;  // 最終行の次の行に挿入
 
