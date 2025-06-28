@@ -85,8 +85,7 @@ function getCardUsageInfoFromMail(subject, regTime, regAmount, regStore, cardTyp
     }
     
     addPaymentInfoToSpreadsheet(cardUsages);
-    sendPost(`（${cardType} ${transactionType}）カード利用情報を登録しました。`);
-    
+    sendPost(`（${cardType} ${transactionType}）カード利用情報を${cardUsages.length}件登録しました。`);
   } catch (error) {
     console.error(`getCardUsageInfoFromMail でエラーが発生しました (${cardType}):`, error);
     sendPost(`（${cardType} ${transactionType}）カード利用情報の取得中にエラーが発生しました。`);
