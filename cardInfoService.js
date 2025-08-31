@@ -119,6 +119,14 @@ const CARD_CONFIGS = {
     regStore: /内容[\s　]*：[\s　]*([^\r\n]+)/,
     cardType: "三井住友カード",
     transactionType: "入金"
+  },
+  SUMITOMO_SHUKKIN: {
+    subject: "【三井住友銀行】口座出金のお知らせ",
+    regTime: /出金日[\s　]*：[\s　]*(\d{4}年\d{1,2}月\d{1,2}日)/,
+    regAmount: /出金額[\s　]*：[\s　]*(-?[0-9,]+)円/,
+    regStore: /内容[\s　]*：[\s　]*([^\r\n]+)/,
+    cardType: "三井住友カード",
+    transactionType: "出金"
   }
 };
 
