@@ -25,6 +25,15 @@ function extractCardUsageFromThreads(threads, regTime, regAmount, regStore, card
       const amountMatch = regAmount instanceof RegExp ? body.match(regAmount) : (regAmount || true);
       const storeMatch = regStore instanceof RegExp ? body.match(regStore) : regStore;
 
+      // デバッグログ
+      Logger.log(`=== ${cardType} ${transactionType} のマッチング結果 ===`);
+      Logger.log(`dateTimeMatch: ${dateTimeMatch ? 'OK' : 'NG'}`);
+      Logger.log(`amountMatch: ${amountMatch ? 'OK' : 'NG'}`);
+      Logger.log(`storeMatch: ${storeMatch ? 'OK' : 'NG'}`);
+      if (!dateTimeMatch) {
+        Logger.log(`メール本文（最初の500文字）:\n${body.substring(0, 500)}`);
+      }
+
       if (dateTimeMatch && amountMatch && storeMatch) {
         let amount = "";
         if (regAmount instanceof RegExp && amountMatch[1]) {
@@ -136,8 +145,8 @@ const CARD_CONFIGS = {
   },
   SUMITOMO_FURIKOMI_SHUKKIN: {
     subject: "【三井住友銀行】振込受付完了のお知らせ",
-    regTime: /受付日時[\s　]*：(\d{4}年\d{1,2}月\d{1,2}日[\s　]*\d{1,2}時\d{2}分)/,
-    regAmount: "",
+    regTime: /受付日時[\s　]*：[\s　]*(\d{4}年\d{1,2}月\d{1,2}日[\s　]*\d{1,2}時[\s　]*\d{1,2}分)/,
+    regAmount: null, // nullに変更して金額チェックをスキップ
     regStore: "インターネットバンキングによる振込",
     cardType: "三井住友カード",
     transactionType: "出金"
