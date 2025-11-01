@@ -20,15 +20,19 @@ function extractCardUsageFromThreads(threads, regTime, regAmount, regStore, card
     const messages = thread.getMessages();
     messages.forEach(message => {
       const body = message.getPlainBody();
-      
-      const dateTimeMatch = body.match(regTime);
-      const amountMatch = body.match(regAmount);
-      const storeMatch = body.match(regStore);
+
+      const dateTimeMatch = regTime instanceof RegExp ? body.match(regTime) : regTime;
+      const amountMatch = regAmount instanceof RegExp ? body.match(regAmount) : (regAmount || true);
+      const storeMatch = regStore instanceof RegExp ? body.match(regStore) : regStore;
 
       if (dateTimeMatch && amountMatch && storeMatch) {
-        let amount = amountMatch[1];
-        if (transactionType === "入金") {
-          amount = `-${amount}`;
+        let amount = "";
+        if (regAmount instanceof RegExp && amountMatch[1]) {
+          amount = amountMatch[1];
+          if (transactionType === "入金") {
+            amount = `-${amount}`;
+          }
+          amount = amount.replace(/,/g, '');
         }
         
         // 日付文字列をDate オブジェクトに変換
@@ -36,10 +40,12 @@ function extractCardUsageFromThreads(threads, regTime, regAmount, regStore, card
         const date = new Date(dateStr.replace(/年|月/g, '/').replace(/日/g, ''));
         const formattedDate = Utilities.formatDate(date, CONSTANTS.TIMEZONE, 'yyyy/MM/dd');
 
+        const storeName = regStore instanceof RegExp ? storeMatch[1].trim() : storeMatch;
+
         cardUsages.push([
           "", "", 
-          amount.replace(/,/g, ''),
-          storeMatch[1].trim(),
+          amount,
+          storeName,
           "", "", "", "",
           cardType,
           "ゆう",
@@ -125,6 +131,14 @@ const CARD_CONFIGS = {
     regTime: /出金日[\s　]*：[\s　]*(\d{4}年\d{1,2}月\d{1,2}日)/,
     regAmount: /出金額[\s　]*：[\s　]*(-?[0-9,]+)円/,
     regStore: /内容[\s　]*：[\s　]*([^\r\n]+)/,
+    cardType: "三井住友カード",
+    transactionType: "出金"
+  },
+  SUMITOMO_FURIKOMI_SHUKKIN: {
+    subject: "【三井住友銀行】振込受付完了のお知らせ",
+    regTime: /受付日時[\s　]*：(\d{4}年\d{1,2}月\d{1,2}日[\s　]*+\d{1,2}時\d{2}分)/,
+    regAmount: "",
+    regStore: "インターネットバンキングによる振込",
     cardType: "三井住友カード",
     transactionType: "出金"
   }
