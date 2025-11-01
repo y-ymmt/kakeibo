@@ -21,16 +21,16 @@ function extractCardUsageFromThreads(threads, regTime, regAmount, regStore, card
     messages.forEach(message => {
       const body = message.getPlainBody();
 
-      const dateTimeMatch = regTime instanceof RegExp ? body.match(regTime) : regTime;
+      const dateTimeMatch = regTime instanceof RegExp ? body.match(regTime) : (regTime || true);
       const amountMatch = regAmount instanceof RegExp ? body.match(regAmount) : (regAmount || true);
-      const storeMatch = regStore instanceof RegExp ? body.match(regStore) : regStore;
+      const storeMatch = regStore instanceof RegExp ? body.match(regStore) : (regStore || true);
 
       // デバッグログ
       Logger.log(`=== ${cardType} ${transactionType} のマッチング結果 ===`);
       Logger.log(`dateTimeMatch: ${dateTimeMatch ? 'OK' : 'NG'}`);
       Logger.log(`amountMatch: ${amountMatch ? 'OK' : 'NG'}`);
       Logger.log(`storeMatch: ${storeMatch ? 'OK' : 'NG'}`);
-      if (!dateTimeMatch) {
+      if (!dateTimeMatch || !amountMatch || !storeMatch) {
         Logger.log(`メール本文（最初の500文字）:\n${body.substring(0, 500)}`);
       }
 
@@ -45,8 +45,24 @@ function extractCardUsageFromThreads(threads, regTime, regAmount, regStore, card
         }
         
         // 日付文字列をDate オブジェクトに変換
-        const dateStr = dateTimeMatch[1];
-        const date = new Date(dateStr.replace(/年|月/g, '/').replace(/日/g, ''));
+        const dateStr = regTime instanceof RegExp ? dateTimeMatch[1] : dateTimeMatch;
+        
+        // dateStrが存在し、文字列型であることを確認
+        if (!dateStr || typeof dateStr !== 'string') {
+          Logger.log(`日付情報の抽出に失敗しました。dateStr: ${dateStr}`);
+          Logger.log(`メール本文（最初の500文字）:\n${body.substring(0, 500)}`);
+          return;
+        }
+        
+        const dateStrFormatted = dateStr.replace(/年|月/g, '/').replace(/日/g, '');
+        const date = new Date(dateStrFormatted);
+        
+        // 日付が有効かチェック
+        if (isNaN(date.getTime())) {
+          Logger.log(`無効な日付形式です。dateStr: ${dateStr}`);
+          return;
+        }
+        
         const formattedDate = Utilities.formatDate(date, CONSTANTS.TIMEZONE, 'yyyy/MM/dd');
 
         const storeName = regStore instanceof RegExp ? storeMatch[1].trim() : storeMatch;
@@ -145,7 +161,7 @@ const CARD_CONFIGS = {
   },
   SUMITOMO_FURIKOMI_SHUKKIN: {
     subject: "【三井住友銀行】振込受付完了のお知らせ",
-    regTime: /受付日時[\s　]*：[\s　]*(\d{4}年\d{1,2}月\d{1,2}日[\s　]*\d{1,2}時[\s　]*\d{1,2}分)/,
+    regTime: /受付日時[\s　]*：[\s　]*(\d{4}年\d{1,2}月\d{1,2}日)[\s　]*\d{1,2}時[\s　]*\d{1,2}分/,
     regAmount: null, // nullに変更して金額チェックをスキップ
     regStore: "インターネットバンキングによる振込",
     cardType: "三井住友カード",
