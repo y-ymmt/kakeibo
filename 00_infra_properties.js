@@ -20,3 +20,14 @@ function getProperty(key) {
   }
   return value;
 }
+
+/**
+ * プロジェクトプロパティを取得する（デフォルト値付き）
+ * @param {string} key - プロパティキー
+ * @param {string} defaultValue - プロパティが設定されていない場合のデフォルト値
+ * @returns {string} プロパティ値またはデフォルト値
+ */
+function getPropertyOrDefault(key, defaultValue) {
+  const value = PropertiesService.getScriptProperties().getProperty(key);
+  return value || defaultValue;
+}

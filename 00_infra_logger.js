@@ -21,11 +21,13 @@ const LOG_LEVEL = {
 const AppLogger = {
   /**
    * 現在のログレベルを取得
+   * スクリプトプロパティ > APP_CONFIG > デフォルト(INFO) の優先順位で取得
    * @returns {number} ログレベル
    * @private
    */
   _getLogLevel: function() {
-    const configLevel = APP_CONFIG.LOG_LEVEL || "INFO";
+    const defaultLevel = APP_CONFIG.LOG_LEVEL || "INFO";
+    const configLevel = getPropertyOrDefault("LOG_LEVEL", defaultLevel);
     return LOG_LEVEL[configLevel] !== undefined ? LOG_LEVEL[configLevel] : LOG_LEVEL.INFO;
   },
 
