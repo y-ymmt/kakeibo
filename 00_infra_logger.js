@@ -20,6 +20,28 @@ const LOG_LEVEL = {
  */
 const AppLogger = {
   /**
+   * 通知コールバック関数（外部から設定可能）
+   * @type {Function|null}
+   * @private
+   */
+  _notificationCallback: null,
+
+  /**
+   * 通知中フラグ（無限ループ防止）
+   * @type {boolean}
+   * @private
+   */
+  _isNotifying: false,
+
+  /**
+   * 通知コールバックを設定
+   * @param {Function} callback - 通知関数 (levelName, message) => void
+   */
+  setNotificationCallback: function(callback) {
+    this._notificationCallback = callback;
+  },
+
+  /**
    * 現在のログレベルを取得
    * スクリプトプロパティ > APP_CONFIG > デフォルト(INFO) の優先順位で取得
    * @returns {number} ログレベル
@@ -62,6 +84,18 @@ const AppLogger = {
         console.log(logMessage);
         if (data !== undefined) {
           console.log(data);
+        }
+      }
+
+      // WARN以上のログで通知コールバックを実行（無限ループ防止付き）
+      if (level >= LOG_LEVEL.WARN && this._notificationCallback && !this._isNotifying) {
+        try {
+          this._isNotifying = true;
+          this._notificationCallback(levelName, message);
+        } catch (error) {
+          console.error("通知コールバックでエラーが発生しました:", error);
+        } finally {
+          this._isNotifying = false;
         }
       }
     }
