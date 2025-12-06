@@ -23,7 +23,7 @@
  * - 00_infra_logger.js (AppLogger)
  * - 20_service_cardUsage.js (processAllCardUsages)
  * - 20_service_fileTemplate.js (createNextMonthSpreadsheetWithNotification)
- * - 20_service_notification.js (sendPost)
+ * - 20_service_notification.js (sendPost, initializeLogNotification)
  */
 
 /**
@@ -36,13 +36,16 @@
  * 前日のメールを検索し、利用情報を抽出してスプレッドシートに登録します。
  */
 function main() {
+  // ログ通知機能の初期化（error/warnログをLINEに通知）
+  initializeLogNotification();
+
   try {
     AppLogger.info("カード利用情報の取得を開始します");
     processAllCardUsages();
     AppLogger.info("カード利用情報の取得が完了しました");
   } catch (error) {
+    // AppLogger.error()でLINE通知が自動送信されるため、sendPost()は不要
     AppLogger.error("メイン処理でエラーが発生しました:", error);
-    sendPost("システムエラーが発生しました。管理者に連絡してください。");
   }
 }
 
@@ -57,5 +60,8 @@ function main() {
  * 作成完了後、LINEで通知を送信します。
  */
 function createNextMonthSpreadsheet() {
+  // ログ通知機能の初期化（error/warnログをLINEに通知）
+  initializeLogNotification();
+
   createNextMonthSpreadsheetWithNotification();
 }
