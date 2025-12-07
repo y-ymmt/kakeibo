@@ -107,7 +107,3 @@ clasp push
 3. LINE Bot APIトークンの有効性
 
 詳細は [clasp公式ドキュメント](https://github.com/google/clasp) または [参考記事](https://qiita.com/zumi0/items/a4dd6e00cad7ee341d77) を参照してください。
-
-## ライセンス
-
-ISC
