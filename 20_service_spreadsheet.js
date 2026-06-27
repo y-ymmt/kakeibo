@@ -8,7 +8,7 @@
  * - 00_config_constants.js (CONSTANTS)
  * - 00_infra_properties.js (getProperty)
  * - 00_infra_logger.js (AppLogger)
- * - 10_domain_dateUtils.js (getCurrentMonthFileName, getNextMonthFileName)
+ * - 10_domain_dateUtils.js (getNextMonthFileName)
  */
 
 /**
@@ -20,66 +20,6 @@
 function isFileExists(folder, fileName) {
   const files = folder.getFilesByName(fileName);
   return files.hasNext();
-}
-
-/**
- * 現在の年月のスプレッドシートを取得する
- * @returns {SpreadsheetApp.Spreadsheet|null} スプレッドシートオブジェクトまたはnull
- */
-function getCurrentMonthSpreadsheet() {
-  try {
-    const folderId = getProperty("FOLDER_ID");
-    const fileName = getCurrentMonthFileName();
-
-    const folder = DriveApp.getFolderById(folderId);
-    const files = folder.getFilesByName(fileName);
-
-    if (files.hasNext()) {
-      const file = files.next();
-      return SpreadsheetApp.openById(file.getId());
-    } else {
-      AppLogger.info(`${fileName}のスプレッドシートが見つかりませんでした。`);
-      return null;
-    }
-  } catch (error) {
-    AppLogger.error("getCurrentMonthSpreadsheet でエラーが発生しました:", error);
-    return null;
-  }
-}
-
-/**
- * カード利用情報をスプレッドシートに追加する
- * @param {Array<Array>} cardUsages - カード利用情報の配列
- */
-function addPaymentInfoToSpreadsheet(cardUsages) {
-  try {
-    const spreadsheet = getCurrentMonthSpreadsheet();
-    if (!spreadsheet) {
-      AppLogger.error("スプレッドシートを取得できませんでした。");
-      return;
-    }
-
-    const sheet = spreadsheet.getSheetByName(CONSTANTS.SHEET_NAME.EXPENSE_LIST);
-    if (!sheet) {
-      AppLogger.error("支出一覧シートが見つかりませんでした。");
-      return;
-    }
-
-    // 配列の検証
-    if (cardUsages.length === 0 || !cardUsages[0]) {
-      AppLogger.warn("追加するデータが空または不正です。");
-      return;
-    }
-
-    const lastRow = sheet.getLastRow();
-    const insertRow = lastRow + 1;
-
-    sheet.getRange(insertRow, 1, cardUsages.length, cardUsages[0].length).setValues(cardUsages);
-    AppLogger.info(`${cardUsages.length}件のカード利用情報を追加しました。`);
-
-  } catch (error) {
-    AppLogger.error("addPaymentInfoToSpreadsheet でエラーが発生しました:", error);
-  }
 }
 
 /**

@@ -8,12 +8,6 @@ const CONSTANTS = {
   /** テンプレートファイル名 */
   TEMPLATE_FILE_NAME: "テンプレート",
 
-  /** シート名定義 */
-  SHEET_NAME: {
-    SUMMARY: "集計",
-    EXPENSE_LIST: "支出一覧"
-  },
-
   /** タイムゾーン */
   TIMEZONE: "Asia/Tokyo",
 
