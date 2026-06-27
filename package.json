@@ -2,7 +2,7 @@
   "name": "kakeibo-automation",
   "version": "2.0.0",
   "description": "家計簿自動化システム - Google Apps Script",
-  "main": "main.js",
+  "main": "30_main.js",
   "scripts": {
     "push": "clasp push",
     "deploy": "clasp deploy"

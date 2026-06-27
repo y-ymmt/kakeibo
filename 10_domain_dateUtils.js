@@ -17,22 +17,3 @@ function getNextMonthFileName() {
   return Utilities.formatDate(nextMonth, CONSTANTS.TIMEZONE, "yyyy年M月");
 }
 
-/**
- * 現在月のファイル名を取得する
- * @returns {string} 現在月のファイル名（例：2024年6月）
- */
-function getCurrentMonthFileName() {
-  const now = new Date();
-  return Utilities.formatDate(now, CONSTANTS.TIMEZONE, "yyyy年M月");
-}
-
-/**
- * 昨日の日付を取得する
- * @returns {Date} 昨日の日付
- */
-function getYesterday() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return yesterday;
-}
-
