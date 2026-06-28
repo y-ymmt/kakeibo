@@ -9,6 +9,7 @@
  * - 00_infra_properties.js (getProperty)
  * - 00_infra_logger.js (AppLogger)
  * - 10_domain_dateUtils.js (getNextMonthFileName)
+ * - 20_service_masterData.js (syncMasterDataToMonthlySpreadsheet)
  */
 
 /**
@@ -23,12 +24,14 @@ function isFileExists(folder, fileName) {
 }
 
 /**
- * テンプレートファイルから新しいファイルを作成する
+ * テンプレートファイルから新しいファイルを作成し、中央マスタを同期する
  * @param {DriveApp.Folder} folder - 対象フォルダ
  * @param {string} fileName - 作成するファイル名
  * @returns {string|null} 作成されたファイルのURLまたはnull
  */
 function createFileFromTemplate(folder, fileName) {
+  let newFile = null;
+
   try {
     const templateFiles = folder.getFilesByName(CONSTANTS.TEMPLATE_FILE_NAME);
     if (!templateFiles.hasNext()) {
@@ -37,12 +40,26 @@ function createFileFromTemplate(folder, fileName) {
     }
 
     const template = templateFiles.next();
-    const newFile = template.makeCopy(fileName, folder);
+    newFile = template.makeCopy(fileName, folder);
     AppLogger.info(`${fileName}を作成しました。`);
+
+    // テンプレートは構造のみを複製し、マスタ値は作成時点の内容を転記する。
+    syncMasterDataToMonthlySpreadsheet(newFile.getId(), fileName);
 
     return newFile.getUrl();
   } catch (error) {
     AppLogger.error("createFileFromTemplate でエラーが発生しました:", error);
+
+    // マスタ同期に失敗した不完全な月別ファイルを残さない。
+    if (newFile) {
+      try {
+        newFile.setTrashed(true);
+        AppLogger.info(`${fileName}をゴミ箱へ移動しました。`);
+      } catch (trashError) {
+        AppLogger.error("不完全なファイルをゴミ箱へ移動できませんでした:", trashError);
+      }
+    }
+
     return null;
   }
 }
@@ -72,7 +89,7 @@ function createNextMonthSpreadsheetFile() {
       };
     }
 
-    // テンプレートファイルの複製
+    // テンプレートファイルを複製し、中央マスタを同期
     const newFileUrl = createFileFromTemplate(folder, nextMonthFileName);
     if (newFileUrl) {
       return {
@@ -86,7 +103,7 @@ function createNextMonthSpreadsheetFile() {
         success: false,
         fileUrl: null,
         fileName: nextMonthFileName,
-        message: "スプレッドシートの作成に失敗しました。"
+        message: "スプレッドシートの作成または中央マスタの同期に失敗しました。"
       };
     }
 
